@@ -75,7 +75,7 @@ do
     
      ## Consultar los discos en la instancia - desacoplarlos
      D=0 
-     DISKS=$(gcloud compute instances list --format="value(disks.source)" --filter="labels.$TAG=true" | sed 's/;/ /g') 
+     DISKS=$(gcloud compute instances describe ${NAME} --format="value(disks.source)" --zone ${ZONE} | sed 's/;/ /g') 
      for DISK in $DISKS
         do
             if [ "$D" -gt 0 ]; then
