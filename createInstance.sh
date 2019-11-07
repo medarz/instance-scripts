@@ -5,13 +5,12 @@
 # - newname=<nombre-instancia>
 # - ip1 (usar - en lugar de .)
 # - ip2 (usar - en lugar de .)
-# - instance-group
-# - newzone - zona a la que se moveria la instancia
+# - [instance-group]
+# - [newzone - zona a la que se moveria la instancia]
 
 ###### Editar los valores siguientes ##########
 SUBNET1=test-subnet
 SUBNET2=admin-central
-SCRIPT=gs://marioarz-test/startup-script-1.sh
 SVCACCOUNT=instance-svc-account@main-testing.iam.gserviceaccount.com
 GROUP=web-group
 TAG=migrate
@@ -38,7 +37,11 @@ case $i in
     shift # past argument
     shift # past value
     ;;
-
+    -s|--script)
+    SCRIPT=$2
+    shift # past arguments
+    shift # past value
+    ;;
 esac
 done
 
@@ -86,16 +89,18 @@ do
      IP1=$(echo $IP1 | sed 's/-/./g')
      IP2=$(echo $IP2 | sed 's/-/./g')
 
-     #Validar el tipo de instancia
-     gcloud compute instances list --format="csv[no-heading](machineType)" --filter="labels.custom=yes" | sed 's/\ /,/g' | tr -d "\""
-
      echo "Creando instancia: ${NEW_NAME}"
      CMD="gcloud compute instances create ${NEW_NAME}  \
         --machine-type=${TYPE} --image=${IMGNAME} --zone ${ZONE} \
         --network-interface=subnet=${SUBNET1},no-address,private-network-ip=${IP1} \
         --network-interface=subnet=${SUBNET2},no-address,private-network-ip=${IP2} \
-        --metadata=startup-script-url=${SCRIPT} \
         --service-account=${SVCACCOUNT} " 
+        
+    # Startup Script
+    if [ ! -z ${SCRIPT+x} ]; then
+        echo "Startup Script: $SCRIPT"
+        CMD+=" --metadata=startup-script-url=${SCRIPT} "
+    fi
 
     # Definir el tipo de instancia
     MTYPE=$(gcloud compute instances describe ${NAME} --format="csv[no-heading](machineType)" --zone ${ZONE} | awk '{split($0,a,"/"); print a[11]}')
@@ -104,7 +109,7 @@ do
         echo "Instancia Custom"
         CPU=$(echo $MTYPE | awk '{split($0,g,"-"); print g[2]}')
         (( GB= $(echo $MTYPE | awk '{split($0,g,"-"); print g[3]}')/1024 ))
-        CMD+=" --custom-vm-type=n2 --custom-cpu=${CPU} --custom-memory=${GB}GB "
+        CMD+=" --custom-vm-type=n1 --custom-cpu=${CPU} --custom-memory=${GB}GB "
         #
     else
         echo "Standard type"
@@ -137,14 +142,13 @@ do
     # Agregando etiqueta
     # instance-group : 
     if [ ! -z ${GROUP+x} ]; then
-        echo "GROUP: $GROUP"
-
+        echo "Instance Group: $GROUP"
         gcloud compute instances add-labels ${NEW_NAME} --zone ${ZONE} --labels=instance-group=${GROUP}-${ZONE}
     fi
 
-    gcloud compute instances remove-labels ${NAME} --zone ${ZONE} --labels=$TAG
+    gcloud compute instances remove-labels ${NAME} --zone ${ZONE} --labels=${TAG}
     gcloud compute instances add-labels ${NEW_NAME} --zone ${ZONE} --labels=copy-of=${NAME}
-    gcloud compute instances add-labels ${NAME} --zone ${ZONE} --labels=$TAG=completed
+    gcloud compute instances add-labels ${NAME} --zone ${ZONE} --labels=${TAG}=completed
 
     # Moviendo la instancia de zona
     
