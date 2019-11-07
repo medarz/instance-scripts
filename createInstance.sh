@@ -18,9 +18,11 @@ TAG=migrate
 
 help () {
     echo "Uso: "
-    echo "$0  [-c]"
+    echo "$0  [-c | -n | -s]"
     echo ""
     echo "    -c : Crea la instancia adicional al snapshot"
+    echo "    -n : Network tags separados por coma"
+    echo "    -s : Ubicacion de GSC de Startup Script"
     echo ""
     exit 1
 }
@@ -32,8 +34,8 @@ case $i in
     CREATE="true"
     shift # past arguments
     ;;
-    -m|--move)
-    NEW_ZONE="$2"
+    -n|--net-tag)
+    NET_TAG="$2"
     shift # past argument
     shift # past value
     ;;
@@ -100,6 +102,12 @@ do
     if [ ! -z ${SCRIPT+x} ]; then
         echo "Startup Script: $SCRIPT"
         CMD+=" --metadata=startup-script-url=${SCRIPT} "
+    fi
+
+    # Network tags
+    if [ ! -z ${NET_TAG+x} ]; then
+        echo "Network Tags: $NET_TAG"
+        CMD+=" --tags=${NET_TAG} "
     fi
 
     # Definir el tipo de instancia
